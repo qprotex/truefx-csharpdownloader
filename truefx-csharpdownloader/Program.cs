@@ -29,11 +29,26 @@ namespace truefx_csharpdownloader
                 { "h|help",  "show this message and exit", v => show_help = v != null },
             };
 
-            List<string> extra = p.Parse(args);
+            try
+            {
+                p.Parse(args);
+            }
+            catch (OptionException e)
+            {
+                Console.Write("bundling: ");
+                Console.WriteLine(e.Message);
+                Console.WriteLine("Try `truefx_csharpdownloader --help' for more information.");
+                return;
+            }
+
+            if (truefx_username == null || truefx_password == null || destination_folder == null || year == 0 || symbol == null) {
+                print_usage(p);
+                Environment.Exit(2);
+             }
 
             if (show_help)
             {
-                ShowHelp(p);
+                print_usage(p);
                 return;
             }
 
@@ -50,9 +65,13 @@ namespace truefx_csharpdownloader
 
         }
 
-        static void ShowHelp(OptionSet p)
+        static void print_usage(OptionSet p)
         {
-            Console.WriteLine("Usage: python get_data_for_year_in_csv.py -u <truefxUsername> -p <truefxPassword> -f <folder> -y <year> -s <symbol>");
+            //Console.WriteLine("Usage: python get_data_for_year_in_csv.py -u <truefxUsername> -p <truefxPassword> -f <folder> -y <year> -s <symbol>");
+            Console.WriteLine("Usage: truefx_csharpdownloader [OPTIONS]+");
+            Console.WriteLine();
+            Console.WriteLine("Options:");
+            p.WriteOptionDescriptions(Console.Out);
         }
 
 

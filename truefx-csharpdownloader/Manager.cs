@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -12,8 +13,6 @@ namespace truefx_csharpdownloader
     class Manager
     {
 
-        //bool login_response_cookies = false;
-        CookieContainer login_response_cookies;
         UrlProvider url_provider = new UrlProvider();
         HttpClient httpClient;
         HttpClientHandler handler;
@@ -23,21 +22,61 @@ namespace truefx_csharpdownloader
         {
 
             download_for_year(year, symbol, directory);
-            //unzip_for_year(year, symbol, directory)
+            unzip_for_year(year, symbol, directory);
 
-            //output_filename = symbol.lower() + '-' + str(year) + '.csv'
-            //files = self.get_filenames_to_merge(str(year), symbol, directory)
+            string output_filename = symbol.ToLower() + "-" + year + ".csv";
+            List<string> files = get_filenames_to_merge(year, symbol, directory);
 
-            //with open(directory + output_filename, 'w') as outfile:
-            //    for fname in files:
-            //        with open(fname) as infile:
-            //            for line in infile:
-            //                outfile.write(line)
-            //            infile.close()
-            //    outfile.close()
+            using (var output = File.Create(output_filename))
+            {
+                foreach (var file in files)
+                {
+                    using (var input = File.OpenRead(file))
+                    {
+                        input.CopyTo(output);
+                    }
+                }
+            }
 
-            //for fname in self.get_filenames_to_delete(year, symbol, directory):
-            //    os.unlink(fname)
+            List<string> deleteFiles = get_filenames_to_delete(year, symbol, directory);
+            foreach (string file in deleteFiles)
+            {
+                File.Delete(file);
+            }
+            
+        }
+
+        public List<string> get_filenames_to_merge(int year, string symbol, string directory) {
+            return Directory.EnumerateFiles(directory, symbol.ToUpper() + '-' + year + "-*.csv", SearchOption.AllDirectories).ToList<string>();
+
+        }
+
+        public List<string> get_filenames_to_delete(int year, string symbol, string directory)
+        {
+            return Directory.EnumerateFiles(directory, symbol.ToUpper() + '-' + year + "-*.*", SearchOption.AllDirectories)
+            .Where(s => s.EndsWith(".csv") || s.EndsWith(".zip")).ToList<string>();
+        }
+
+        public void unzip_for_year(int year, string symbol, string directory) {
+
+            for (int month = 1; month <= 12; month++)
+                unzip_for_month(year, month, symbol, directory);
+        }
+
+        public void unzip_for_month(int year, int month, string symbol, string directory) {
+
+            string filename = get_downloaded_filename(month, symbol, year);
+
+            string filename_with_directory = directory + filename;
+
+            try
+            {
+                ZipFile.ExtractToDirectory(filename_with_directory, directory);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error uncompressing file {0} - {1}", filename_with_directory, ex.Message);
+            }
         }
 
         public void download_for_year(int year, string symbol, string destination_directory)
@@ -86,23 +125,9 @@ namespace truefx_csharpdownloader
         public bool login_to_true_fx(string username, string password)
         {
 
-            string proxyUri = "127.0.0.1:8888";
-
-            //NetworkCredential proxyCreds = new NetworkCredential(
-            //    proxyServerSettings.UserName,
-            //    proxyServerSettings.Password
-            //);
-
-            WebProxy proxy = new WebProxy(proxyUri, false)
-            {
-                UseDefaultCredentials = false,
-                Credentials = null,
-            };
-
             HttpResponseMessage response = null;
             handler = new HttpClientHandler() {
-                CookieContainer = new CookieContainer(),
-                Proxy = proxy,
+                CookieContainer = new CookieContainer()
             };
 
             httpClient = new HttpClient(handler) {
